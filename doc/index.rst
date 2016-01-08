@@ -1,65 +1,43 @@
-.. Deltas documentation master file, created by
-   sphinx-quickstart on Fri Jul  4 14:02:59 2014.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 Deltas -- Experimental Difference Algorithms
 ============================================
-**Deltas** is an open licensed (MIT) library for performing generating deltas
-(A.K.A sequences of operations) representing the difference between two
-sequences of comparable  tokens.
+This library provides utilities for generating deltas (A.K.A sequences of operations) representing the difference between two sequences of comparable  tokens.  This library is intended to be used to make experimental difference detection strategies more easily available.
 
 * **Installation:** ``pip install deltas``
-* **Repository:** `http://github.com/halfak/Deltas <http://github.com/halfak/Deltas>`_
+* **Documentation:** https://pythonhosted.org/deltas
+* **Repository:** http://github.com/halfak/deltas
+* **License:** MIT
 
-This library is intended to be used to make experimental difference detection
-strategies more easily available.  There are currently two strategies available:
+Contents
+--------
+.. toctree::
+    :maxdepth: 1
 
-:class:`~deltas.detection.sequence_matcher`
-    A shameless wrapper around `difflib.SequenceMatcher` to get it to work
-    within the structure of *deltas*.
-:class:`~deltas.detection.segment_matcher`
-    A generalized difference detector that is designed to detect block moves
-    and copies based on the use of a :class:`~deltas.segmenters.Segmenter`.
-    
+    algorithms
+    operations
+    tokenizers
+    segmenters
+    apply
 
-:Example:
-    >>> from deltas import segment_matcher, apply
+Example
+-------
+    >>> from deltas import segment_matcher, text_split
     >>>
-    >>> a_tokens = ["This", " ", "comes", " ", "first", ".",
-    ...             " ",
-    ...             "This", " ", "comes", " ", "second", "."]
+    >>> a = text_split.tokenize("This is some text.  This is some other text.")
+    >>> b = text_split.tokenize("This is some other text.  This is some text.")
+    >>> operations = segment_matcher.diff(a, b)
     >>>
-    >>> b_tokens = ["This", " ", "comes", " ", "second", ".",
-    ...             " ",
-    ...             "This", " ", "comes", " ", "first", "."]
-    >>>
-    >>> operations = segment_matcher.diff(a_tokens, b_tokens)
-    >>>
-    >>> for operation in operations:
-    ...     print(operation)
+    >>> for op in operations:
+    ...     print(op.name, repr(''.join(a[op.a1:op.a2])),
+    ...           repr(''.join(b[op.b1:op.b2])))
     ...
-    Equal(name='equal', a1=7, a2=13, b1=0, b2=6)
-    Insert(name='insert', a1=6, a2=7, b1=6, b2=7)
-    Equal(name='equal', a1=0, a2=6, b1=7, b2=13)
-    Delete(name='delete', a1=6, a2=7, b1=13, b2=13)
+    equal 'This is some other text.' 'This is some other text.'
+    insert ' ' '  '
+    equal 'This is some text.' 'This is some text.'
+    delete '  ' ''
 
-Detect differences
-------------------
-.. automodule:: deltas.detection
-
-Operations
-----------
-.. automodule:: deltas.operations
-
-Tokenizers
-----------
-.. automodule:: deltas.tokenizers
-
-Segmenters
-----------
-.. automodule:: deltas.segmenters
-
+Author
+======
+* Aaron Halfaker -- https://github.com/halfak
 
 Indices and tables
 ==================

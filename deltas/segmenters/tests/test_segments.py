@@ -1,51 +1,57 @@
 from nose.tools import eq_
+import pickle
 
-from ..segments import Token, IndexedSegment, MatchableSegment, \
-                       TokenSequence, MatchableTokenSequence, \
-                       SegmentNodeCollection, MatchableSegmentNodeCollection
+from ...tokenizers import Token
+from ..segments import MatchableSegment, Segment
 
-def test_matchable_types():
-    
-    tokens = ["foo", " ", "bar", " ", "baz"]
-    
-    ms = MatchableSegment(b"checksum test", match="derp")
+
+def test_matchable_segment():
+
+    words = ["foo", "bar", "baz"]
+
+    ms = MatchableSegment(0, [Token(c) for c in enumerate(words)])
+    eq_(ms.start, 0)
+    eq_(ms.end, len(words))
     hash(ms)
+    eq_(ms.match, None)
+    ms.match = "derp"
     eq_(ms.match, "derp")
-    
-    t = Token(0, tokens[0])
-    hash(t)
-    
-    mts = MatchableTokenSequence([Token(i, c) for i, c in enumerate(tokens)])
-    hash(mts)
-    
-    msnc = MatchableSegmentNodeCollection(
-            [MatchableTokenSequence([Token(i, c) for i, c in enumerate(tokens)])])
-    hash(msnc)
 
-def test_indexable_types():
-    tokens = ["foo", " ", "bar", " ", "baz"]
-    
-    iis = IndexedSegment(0, 1)
-    eq_(iis.start, 0)
-    eq_(iis.end, 1)
-    eq_(len(iis), 1)
-    
-    t = Token(0, tokens[0])
-    eq_(t.start, 0)
-    eq_(t.end, 1)
-    eq_(len(t), 1)
-    
-    ts = TokenSequence([Token(i, c) for i, c in enumerate(tokens)])
-    eq_(ts.start, 0)
-    eq_(ts.end, len(tokens))
-    
-    snc = SegmentNodeCollection(
-            [TokenSequence([Token(i, c) for i, c in enumerate(tokens)])])
-    eq_(snc.start, 0)
-    eq_(snc.end, len(tokens))
+    d = {}
+    d[ms] = ms
+
+    ms2 = MatchableSegment(0, [Token(c) for c in enumerate(words)])
+    assert ms2 in d
+
+def test_segment():
+
+    words = ["foo", "bar", "baz"]
+
+    ms = Segment(0, [Token(c) for c in enumerate(words)])
+    eq_(ms.start, 0)
+    eq_(ms.end, len(words))
 
 def test_equality():
-    t1 = Token(0, "foo")
-    t2 = Token(1, "foo")
-    eq_(hash(t1), hash(t2))
-    eq_(t1, t2)
+    print(hash(MatchableSegment(0, [Token("zero"), Token("one")])))
+    print(hash(MatchableSegment(2, [Token("zero"), Token("one")])))
+    eq_(MatchableSegment(0, [Token("zero"), Token("one")]),
+        MatchableSegment(2, [Token("zero"), Token("one")]))
+    eq_(MatchableSegment(0, [
+            MatchableSegment(0, [Token("zero"), Token("one")]),
+            MatchableSegment(2, [Token("two"), Token("three")])
+        ]),
+        MatchableSegment(4, [
+            MatchableSegment(4, [Token("zero"), Token("one")]),
+            MatchableSegment(6, [Token("two"), Token("three")])
+        ])
+    )
+
+def test_pickling():
+    segment = MatchableSegment(0, [
+        MatchableSegment(0, [Token("zero"), Token("one")]),
+        Segment(2, [Token("two"), Token("three")])
+    ])
+
+    unpickled_segment = pickle.loads(pickle.dumps(segment))
+    eq_(list(segment.tokens()),
+        list(unpickled_segment.tokens()))

@@ -1,13 +1,18 @@
-.. _deltas.tokenizers:
-
-Tokenizers -- tokenize text
-===========================
+Tokenizers
+==========
 
 .. automodule:: deltas.tokenizers
     :members:
 
-.. autoclass:: deltas.tokenizers.Tokenizer
+Classes
+-------
+
+.. autoclass:: deltas.Tokenizer
     :members:
 
-.. autoclass:: deltas.tokenizers.TextSplit
+.. autoclass:: deltas.RegexTokenizer
     :members:
+
+Token
+------
+.. automodule:: deltas.tokenizers.token

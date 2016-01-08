@@ -2,10 +2,10 @@
 Segments represent subsequences of tokens that have interesting properties.  All
 segments are based on two abstract types:
 
-:class:`deltas.segmenters.segments.IndexedSegment`
+:class:`deltas.Segment`
     A segment of text with a ``start`` and ``end`` index that refers to the
     original sequence of tokens.
-:class:`deltas.segmenters.segments.MatchableSegment`
+:class:`deltas.MatchableSegment`
     A segment of text that can be matched with another segment no matter where
     it appears in a document.  Generally segmnents of this type represent a
     substantial collection of tokens.
@@ -13,220 +13,112 @@ segments are based on two abstract types:
 Segment Types
 ^^^^^^^^^^^^^
 
-.. autoclass:: deltas.segmenters.segments.IndexedSegment
+.. autoclass:: deltas.Segment
     :members:
 
-.. autoclass:: deltas.segmenters.segments.MatchableSegment
-    :members:
-
-.. autoclass:: deltas.segmenters.segments.Token
-    :members:
-
-.. autoclass:: deltas.segmenters.segments.SegmentNode
-    :members:
-
-.. autoclass:: deltas.segmenters.segments.MatchableSegmentNode
-    :members:
-
-.. autoclass:: deltas.segmenters.segments.TokenSequence
-    :members:
-
-.. autoclass:: deltas.segmenters.segments.MatchableTokenSequence
-    :members:
-
-.. autoclass:: deltas.segmenters.segments.SegmentNodeCollection
-    :members:
-
-.. autoclass:: deltas.segmenters.segments.MatchableSegmentNodeCollection
+.. autoclass:: deltas.MatchableSegment
     :members:
 """
-import types
-from hashlib import sha1
-from itertools import chain
-
-from ..util import LookAhead
+import hashlib
 
 
-def generate_checksum(string):
-    string = str(string)
-    return sha1(bytes(string, 'utf-8', 'replace')).digest()
-
-class IndexedSegment:
+class Segment(list):
+    __slots__ = ("start", )
     """
-    A segment of text with a ``start`` and ``end`` index that refers to the
-    original sequence of tokens.
+    Represents a sequence of of tokens.  Note that plain Segments are not
+    matchable.  Plain segments are generally reserved for whitespace.  For
+    matchable segments, see :class:`~deltas.MatchableSegment`.
+
+    Note that :class:`~deltas.Segment` behaves like a list, but it
+    will expect that everything added will be of type
+    :class:`~deltas.Segment` or :class:`~deltas.Token`.
     """
-    def __init__(self, start, end):
+    def __new__(cls, *args, **kwargs):
+        if len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], cls):
+            args[0]
+        else:
+            inst = super().__new__(cls, *args, **kwargs)
+            inst.initialize(*args, **kwargs)
+            return inst
+
+    def __init__(self, *args, **kwargs): pass
+
+    def initialize(self, start=0, subsegments=None):
+        subsegments = subsegments or []
+        super().__init__(subsegments)
         self.start = int(start)
-        self.end = int(end)
-    
-    def __len__(self):
-        return self.end - self.start
 
-class MatchableSegment:
+    def tokens(self):
+        """
+        `generator` : the tokens in this segment
+        """
+        for subsegment_or_token in self:
+            if isinstance(subsegment_or_token, Segment):
+                subsegment = subsegment_or_token
+                for token in subsegment.tokens():
+                    yield token
+            else:
+                token = subsegment_or_token
+                yield token
+
+    @property
+    def end(self):
+        """
+        The index of the last :class:`deltas.Token` in the segment.
+        """
+        return self.start + sum(1 for _ in self.tokens())
+
+    def __repr__(self):
+        return "{0}({1})".format(self.__class__.__name__, super().__repr__())
+
+    def __str__(self):
+        return ''.join(str(ss) for ss in self)
+
+    def __eq__(self, other):
+        raise NotImplementedError()
+
+    def __neq__(self, other):
+        raise NotImplementedError()
+
+    def __hash__(self, other):
+        raise NotImplementedError()
+
+
+class MatchableSegment(Segment):
     """
-    A segment of text that can be matched with another segment no matter where
-    it appears in a document.  Generally segmnents of this type represent a
-    substantial collection of tokens.
+    Constructs a segment that can be matched.  Segments of this type general
+    contain important content that might have been copied between different
+    versions of text.
     """
-    def __init__(self, checksum, match=None):
-        self.checksum = bytes(checksum)
-        self.match = match
-    
-    def __hash__(self):
-        return hash(self.checksum)
-    
+    __slots__ = ("sha1", "match")
+
+    def initialize(self, *args, **kwargs):
+        super().initialize(*args, **kwargs)
+        self.sha1 = hashlib.sha1(bytes(str(self), 'utf-8'))
+        self.match = None
+
     def __eq__(self, other):
         try:
             return hash(self) == hash(other)
-        except TypeError:
-            raise TypeError("Cannot compare {0} ".format(type(self)) + \
-                            "to {0}.".format(type(other)))
-    
+        except AttributeError:
+            return False
+
     def __neq__(self, other):
-        return not self == other
-    
-    
+        try:
+            return hash(self) != hash(other)
+        except AttributeError:
+            return False
 
+    def __hash__(self):
+        return hash(self.sha1.digest())
 
-class Token(MatchableSegment, IndexedSegment):
-    """
-    A token of content.  Both indexed and matchable
-    
-    :Parameters:
-        start : int
-            The index at which the token appears in the original token sequence.
-        content : `str`
-            The content of the token.
-        
-    """
-    def __new__(cls, *args):
-        if len(args) == 1:
-            if isinstance(args[0], cls):
-                return args[0]
-            else:
-                raise TypeError("Expected {0}, got {1}".format(cls,
-                                                               type(args[0])))
-                
-        elif len(args) == 2:
-            start, content = args
-            inst = super().__new__(cls)
-            inst.initiate(start, content)
-            return inst
-        
-        else:
-            raise TypeError("Expected 2 arguments, " + \
-                            "got {0}:{1}".format(len(args), repr(args)))
-    
-    def __init__(self, *args, **kwargs): pass
-    
-    def initiate(self, start, content):
-        IndexedSegment.__init__(self, start, start+1)
-        MatchableSegment.__init__(self, generate_checksum(content))
-        
-        self.content = str(content)
-    
-    def __str__(self): return self.content
-    
-    def __repr__(self):
-        return repr(self.content)
-    
-    def tokens(self): yield self
+    def __getstate__(self): return (self.start, list(self))
+    def __setstate__(self, args): self.initialize(*args)
 
-class SegmentNode(IndexedSegment, list):
-    """
-    An indexed list of :class:`~deltas.segmenters.segments.IndexedSegment`.
-    
-    :Parameters:
-        children : :class:`~deltas.segmenters.segments.IndexedSegment`.
-            All segment node children
-    
-    """
-    def __init__(self, children):
-        list.__init__(self, children)
-        IndexedSegment.__init__(self, self[0].start, self[-1].end)
-    
-    def tokens(self): raise NotImplementedError()
-    
-    def __repr__(self):
-        return "{0}({1})".format(self.__class__.__name__, list.__repr__(self))
+    def append(self, subsegment):
+        super().append(subsegment)
+        self.sha1.update(bytes(str(subsegment), 'utf-8'))
 
-
-class MatchableSegmentNode(MatchableSegment, SegmentNode):
-    """
-    A matchable indexed list of :class:`~deltas.segmenters.segments.SegmentNode`.
-    
-    :Parameters:
-        children : :class:`~deltas.segmenters.segments.SegmentNode`.
-            All segment node children
-    
-    """
-    def __init__(self, children, match=None):
-        SegmentNode.__init__(self, children)
-        checksum = generate_checksum("".join(str(t)
-                                     for child in children
-                                     for t in child.tokens()))
-        
-        MatchableSegment.__init__(self, checksum, match=match)
-
-class TokenSequence(SegmentNode):
-    """
-    An list of :class:`~deltas.segmenters.segments.Token`.
-    
-    :Parameters:
-        tokens : :class:`~deltas.segmenters.segments.Token`.
-            All token children
-    
-    """
-    def __init__(self, tokens):
-        SegmentNode.__init__(self, tokens)
-        
-    def tokens(self): return self
-
-
-class MatchableTokenSequence(MatchableSegment, TokenSequence):
-    """
-    A matchable list of :class:`~deltas.segmenters.segments.Token`.
-    
-    :Parameters:
-        tokens : :class:`~deltas.segmenters.segments.Token`.
-            All token children
-    
-    """
-    def __init__(self, tokens, match=None):
-        TokenSequence.__init__(self, tokens)
-        hash = sha1(b"".join(bytes(t.content, 'utf-8') for t in tokens))
-        
-        MatchableSegment.__init__(self, hash.digest(), match=match)
-    
-
-class SegmentNodeCollection(SegmentNode, list):
-    """
-    A list of :class:`~deltas.segmenters.segments.SegmentNode`.
-    
-    :Parameters:
-        tokens : :class:`~deltas.segmenters.segments.SegmentNode`.
-            All node children
-    
-    """
-    def __init__(self, children):
-        assert sum(isinstance(c, SegmentNode) for c in children) == len(children)
-        SegmentNode.__init__(self, children)
-        list.__init__(self, children)
-    
-    def tokens(self): return (t for c in children for t in c.tokens())
-    
-
-class MatchableSegmentNodeCollection(SegmentNodeCollection,
-                                     MatchableSegmentNode):
-    """
-    A matchable list of :class:`~deltas.segmenters.segments.SegmentNode`.
-
-    :Parameters:
-     tokens : :class:`~deltas.segmenters.segments.SegmentNode`.
-         All node children
-
-    """
-    def __init__(self, children, match=None):
-        SegmentNodeCollection.__init__(self, children)
-        MatchableSegmentNode.__init__(self, children, match=match)
+    def extend(self, subsegments):
+        for subsegment in subsegments:
+            self.append(subsegment)

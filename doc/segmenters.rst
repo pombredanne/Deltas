@@ -1,19 +1,14 @@
-.. _deltas.segmenters:
-
-Segmenters -- Join tokens into hierarchical clusters
-====================================================
+Segmenters
+==========
 
 .. automodule:: deltas.segmenters
 
-.. autoclass:: deltas.segmenters.Segmenter
+.. autoclass:: deltas.ParagraphsSentencesAndWhitespace
+    :members:
+
+.. autoclass:: deltas.Segmenter
     :members:
     :member-order: bysource
-
-
-Paragraphs, Sentences and Whitespace
-------------------------------------
-.. automodule:: deltas.segmenters.paragraphs_sentences_and_whitespace
-
 
 Segments
 ------------------

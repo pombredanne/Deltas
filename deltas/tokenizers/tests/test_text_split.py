@@ -1,10 +1,9 @@
 from nose.tools import eq_
 
-from ..text_split import TextSplit
+from ..text_split import text_split
+
 
 def test_simple_text_split():
-    
-    tokenizer = TextSplit()
     
     
     input = "As a sentence, this includes punctuation. \n" + \
@@ -16,7 +15,6 @@ def test_simple_text_split():
                 'then', ' ', 'we', ' ', 'have', ' ', 'another', ' ', 'sentence',
                 ' ', 'here', '!']
     
-    tokens = tokenizer.tokenize(input)
+    tokens = list(text_split.tokenize(input))
     
     eq_(tokens, expected)
-    
